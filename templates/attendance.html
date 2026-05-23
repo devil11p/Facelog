@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% block title %}Mark Attendance — AttendAI{% endblock %}
+
+{% block head %}
+<style>
+.attendance-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 20px;
+}
+.camera-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.camera-top {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.camera-wrap {
+  position: relative;
+  background: #000;
+}
+#video-el {
+  width: 100%;
+  display: block;
+  max-height: 480px;
+  object-fit: cover;
+}
+#canvas-el { display: none; }
+.overlay-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+.camera-bottom {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+#start-btn { min-width: 140px; }
+
+/* Right panel */
+.panel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+}
+.panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-family: 'Space Mono', monospace;
+}
+.detection-box {
+  padding: 20px;
+  min-height: 200px;
+}
+.face-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.face-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.face-avatar.recognized { background: rgba(0,255,157,0.12); border: 2px solid var(--green); }
+.face-avatar.unknown    { background: rgba(255,165,0,0.12);  border: 2px solid orange; }
+.face-avatar.spoof      { background: rgba(255,61,90,0.12);  border: 2px solid var(--red); }
+.face-info { flex: 1; min-width: 0; }
+.face-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.face-conf { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; }
+.mark-btn {
+  padding: 6px 12px;
+  background: var(--green);
+  color: #080c14;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: 'Syne', sans-serif;
+  transition: all 0.15s;
+}
+.mark-btn:hover { opacity: 0.85; }
+.mark-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Log */
+.log-list {
+  padding: 0 20px 16px;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.log-item {
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--bg);
+  border-left: 3px solid;
+}
+.log-item.present { border-color: var(--green); color: var(--green); }
+.log-item.checkout { border-color: var(--accent); color: var(--accent); }
+.log-item.unknown  { border-color: var(--muted);  color: var(--muted); }
+
+.scan-indicator {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  margin-right: 6px;
+  transition: background 0.3s;
+}
+.scan-indicator.active { background: var(--green); animation: pulse 1s infinite; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <h2>📷 Mark Attendance</h2>
+  <div class="topbar-right">
+    <span class="badge badge-green" id="marked-count">Marked: 0</span>
+    <button class="btn btn-ghost btn-sm" onclick="location.href='/dashboard'">← Dashboard</button>
+  </div>
+</div>
+<div class="content">
+  <div class="attendance-layout">
+    <!-- Camera -->
+    <div class="camera-card">
+      <div class="camera-top">
+        <span class="scan-indicator" id="scan-dot"></span>
+        <span style="font-size:13px;font-weight:700;">Live Camera Feed</span>
+        <span id="fps-label" style="font-size:11px;color:var(--muted);font-family:Space Mono,monospace;margin-left:auto;"></span>
+      </div>
+      <div class="camera-wrap">
+        <video id="video-el" autoplay playsinline muted></video>
+        <canvas id="overlay-canvas" class="overlay-canvas"></canvas>
+        <canvas id="canvas-el"></canvas>
+      </div>
+      <div class="camera-bottom">
+        <div style="font-size:12px;color:var(--muted);">Position face in camera. Ensure good lighting.</div>
+        <button class="btn btn-primary" id="start-btn" onclick="startCamera()">▶ Start Camera</button>
+        <button class="btn btn-ghost" id="stop-btn" onclick="stopCamera()" style="display:none;">⏹ Stop</button>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div>
+      <div class="panel-card" style="margin-bottom:16px;">
+        <div class="panel-header">🔍 Detected Faces</div>
+        <div class="detection-box" id="detection-box">
+          <div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px;">
+            Start camera to detect faces
+          </div>
+        </div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-header">✅ Attendance Log</div>
+        <div class="log-list" id="log-list">
+          <div style="text-align:center;color:var(--muted);padding:20px;font-size:12px;">No records yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let stream = null;
+let scanning = false;
+let scanInterval = null;
+let markedToday = new Set();
+let logItems = [];
+let markedCount = 0;
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
+    const video = document.getElementById('video-el');
+    video.srcObject = stream;
+    await video.play();
+    document.getElementById('start-btn').style.display = 'none';
+    document.getElementById('stop-btn').style.display = '';
+    scanning = true;
+    document.getElementById('scan-dot').classList.add('active');
+    scanInterval = setInterval(captureAndRecognize, 1500);
+    showToast('Camera started!', 'success');
+  } catch(e) {
+    showToast('Camera access denied. Please allow camera permissions.', 'error');
+  }
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  scanning = false;
+  document.getElementById('scan-dot').classList.remove('active');
+  document.getElementById('start-btn').style.display = '';
+  document.getElementById('stop-btn').style.display = 'none';
+  document.getElementById('detection-box').innerHTML = `<div style="text-align:center;color:var(--muted);padding:40px 0;font-size:13px;">Camera stopped</div>`;
+}
+
+async function captureAndRecognize() {
+  const video = document.getElementById('video-el');
+  const canvas = document.getElementById('canvas-el');
+  const overlay = document.getElementById('overlay-canvas');
+
+  if (!video.videoWidth) return;
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  const imageData = canvas.toDataURL('image/jpeg', 0.8);
+
+  try {
+    const res = await fetch('/api/recognize', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({image: imageData})
+    });
+    const data = await res.json();
+    if (data.success) {
+      renderDetections(data.faces, video.videoWidth, video.videoHeight);
+    }
+  } catch(e) { /* silent */ }
+}
+
+function renderDetections(faces, vw, vh) {
+  const overlay = document.getElementById('overlay-canvas');
+  const octx = overlay.getContext('2d');
+  octx.clearRect(0, 0, vw, vh);
+
+  const box = document.getElementById('detection-box');
+
+  if (!faces || faces.length === 0) {
+    box.innerHTML = `<div style="text-align:center;color:var(--muted);padding:30px 0;font-size:13px;">👁 No face detected</div>`;
+    return;
+  }
+
+  // Draw on overlay
+  const scaleX = overlay.offsetWidth / vw;
+  const scaleY = overlay.offsetHeight / vh;
+
+  faces.forEach(f => {
+    const [x, y, w, h] = f.box;
+    const color = f.status === 'recognized' ? '#00ff9d' : f.status === 'spoof' ? '#ff3d5a' : 'orange';
+    octx.strokeStyle = color;
+    octx.lineWidth = 2;
+    octx.strokeRect(x * scaleX, y * scaleY, w * scaleX, h * scaleY);
+
+    // Label
+    octx.fillStyle = color;
+    octx.font = 'bold 13px Space Mono';
+    octx.fillText(`${f.name} ${f.confidence}%`, x * scaleX, (y * scaleY) - 6);
+  });
+
+  // Render face cards
+  box.innerHTML = faces.map(f => {
+    const emoji = f.status === 'recognized' ? '✅' : f.status === 'spoof' ? '🚫' : '❓';
+    const alreadyMarked = f.student_id && markedToday.has(f.student_id);
+    return `
+    <div class="face-card">
+      <div class="face-avatar ${f.status}"><span>${emoji}</span></div>
+      <div class="face-info">
+        <div class="face-name">${f.name}</div>
+        <div class="face-conf">Conf: ${f.confidence}% | ${f.is_live ? 'LIVE ✓' : 'SPOOF ✗'}</div>
+      </div>
+      ${f.status === 'recognized' && f.student_id
+        ? `<button class="mark-btn" onclick="markAttendance('${f.student_id}','${f.name}',${f.confidence})" ${alreadyMarked ? 'disabled' : ''}>
+            ${alreadyMarked ? 'Marked ✓' : 'Mark ✓'}
+           </button>`
+        : ''
+      }
+    </div>`;
+  }).join('');
+}
+
+async function markAttendance(studentId, name, confidence) {
+  try {
+    const res = await fetch('/api/mark_attendance', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({student_id: studentId, confidence})
+    });
+    const data = await res.json();
+    if (data.success) {
+      markedToday.add(studentId);
+      markedCount++;
+      document.getElementById('marked-count').textContent = `Marked: ${markedCount}`;
+
+      const type = data.action === 'checkin' ? 'present' : 'checkout';
+      const label = data.action === 'checkin' ? `✅ ${name} — Check-In ${data.time}` : `⬅ ${name} — Check-Out ${data.time}`;
+      addLog(label, type);
+      showToast(`${name} marked ${data.action === 'checkin' ? 'Present' : 'Checked Out'}!`, 'success');
+    }
+  } catch(e) {
+    showToast('Error marking attendance.', 'error');
+  }
+}
+
+function addLog(text, type) {
+  logItems.unshift({text, type});
+  const list = document.getElementById('log-list');
+  list.innerHTML = logItems.slice(0, 20).map(l =>
+    `<div class="log-item ${l.type}">${l.text}</div>`
+  ).join('');
+}
+</script>
+{% endblock %}

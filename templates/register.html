@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Register Student — AttendAI{% endblock %}
+
+{% block head %}
+<style>
+.reg-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  font-family: 'Space Mono', monospace;
+}
+.form-group input {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px;
+  color: var(--text); font-size: 13px; font-family: 'Syne', sans-serif;
+  outline: none; transition: border-color 0.2s;
+}
+.form-group input:focus { border-color: var(--accent); }
+.form-group.full { grid-column: 1/-1; }
+
+.samples-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  margin: 16px 0;
+}
+.sample-slot {
+  aspect-ratio: 1;
+  background: var(--bg);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: var(--muted);
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.sample-slot.filled { border-color: var(--green); border-style: solid; }
+.sample-slot img { width: 100%; height: 100%; object-fit: cover; }
+
+.progress-bar {
+  width: 100%; height: 4px;
+  background: var(--border); border-radius: 2px; overflow: hidden;
+  margin-bottom: 12px;
+}
+.progress-fill {
+  height: 100%; background: var(--green); border-radius: 2px;
+  transition: width 0.3s;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <h2>➕ Register New Student</h2>
+  <div class="topbar-right">
+    <button class="btn btn-ghost btn-sm" onclick="location.href='/students'">← Students</button>
+  </div>
+</div>
+<div class="content">
+  <div class="reg-layout">
+    <!-- Form -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Student Details</span></div>
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Full Name *</label>
+          <input type="text" id="name" placeholder="e.g. Rahul Sharma" />
+        </div>
+        <div class="form-group">
+          <label>Roll Number *</label>
+          <input type="text" id="roll_no" placeholder="e.g. 0033" />
+        </div>
+        <div class="form-group">
+          <label>Class</label>
+          <input type="text" id="class_name" placeholder="e.g. 12" />
+        </div>
+        <div class="form-group">
+          <label>Section</label>
+          <input type="text" id="section" placeholder="e.g. A" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="email" placeholder="optional" />
+        </div>
+      </div>
+      <div style="margin-top:20px;">
+        <button class="btn btn-primary" onclick="submitRegistration()" id="submit-btn" style="width:100%;">
+          ✅ Register Student
+        </button>
+      </div>
+    </div>
+
+    <!-- Camera -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Face Capture</span>
+        <span class="badge badge-cyan" id="capture-count">0 / 5 captured</span>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+
+      <div style="background:#000;border-radius:var(--radius);overflow:hidden;margin-bottom:16px;">
+        <video id="reg-video" autoplay playsinline muted style="width:100%;max-height:280px;display:block;object-fit:cover;"></video>
+        <canvas id="reg-canvas" style="display:none;"></canvas>
+      </div>
+
+      <div class="samples-grid" id="samples-grid">
+        <div class="sample-slot">📷</div>
+        <div class="sample-slot">📷</div>
+        <div class="sample-slot">📷</div>
+        <div class="sample-slot">📷</div>
+        <div class="sample-slot">📷</div>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="startRegCamera()" id="cam-start-btn" style="flex:1;">▶ Start Camera</button>
+        <button class="btn btn-primary" onclick="captureFrame()" id="capture-btn" style="flex:1;display:none;">📸 Capture</button>
+        <button class="btn btn-danger btn-sm" onclick="resetCaptures()" style="min-width:80px;">🔄 Reset</button>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);">
+        💡 Capture 5 photos from different angles: front, slight left, slight right, tilted up, tilted down.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let regStream = null;
+let capturedImages = [];
+const NEEDED = 5;
+
+async function startRegCamera() {
+  try {
+    regStream = await navigator.mediaDevices.getUserMedia({ video: {width:640, height:480, facingMode:'user'} });
+    document.getElementById('reg-video').srcObject = regStream;
+    await document.getElementById('reg-video').play();
+    document.getElementById('cam-start-btn').style.display = 'none';
+    document.getElementById('capture-btn').style.display = '';
+    showToast('Camera ready! Capture 5 photos.', 'info');
+  } catch(e) {
+    showToast('Camera access denied.', 'error');
+  }
+}
+
+function captureFrame() {
+  if (capturedImages.length >= NEEDED) {
+    showToast('Already captured 5 photos!', 'info');
+    return;
+  }
+  const video = document.getElementById('reg-video');
+  const canvas = document.getElementById('reg-canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  capturedImages.push(dataUrl);
+  updateSamplesUI();
+}
+
+function updateSamplesUI() {
+  const grid = document.getElementById('samples-grid');
+  const count = capturedImages.length;
+  grid.innerHTML = Array.from({length: NEEDED}, (_, i) => {
+    if (i < count) {
+      return `<div class="sample-slot filled"><img src="${capturedImages[i]}" alt="Face ${i+1}" /></div>`;
+    }
+    return `<div class="sample-slot">📷</div>`;
+  }).join('');
+  document.getElementById('capture-count').textContent = `${count} / ${NEEDED} captured`;
+  document.getElementById('progress-fill').style.width = `${(count/NEEDED)*100}%`;
+  if (count >= NEEDED) {
+    document.getElementById('capture-btn').textContent = '✅ Done!';
+    document.getElementById('capture-btn').disabled = true;
+    showToast('5 photos captured! Now fill details and register.', 'success');
+  }
+}
+
+function resetCaptures() {
+  capturedImages = [];
+  document.getElementById('capture-btn').textContent = '📸 Capture';
+  document.getElementById('capture-btn').disabled = false;
+  updateSamplesUI();
+}
+
+async function submitRegistration() {
+  const name     = document.getElementById('name').value.trim();
+  const roll_no  = document.getElementById('roll_no').value.trim();
+  const class_name = document.getElementById('class_name').value.trim();
+  const section  = document.getElementById('section').value.trim();
+  const email    = document.getElementById('email').value.trim();
+
+  if (!name || !roll_no) { showToast('Name and Roll Number are required!', 'error'); return; }
+  if (capturedImages.length < 3) { showToast('Please capture at least 3 face photos!', 'error'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Registering...';
+
+  try {
+    const res = await fetch('/api/register_student', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name, roll_no, class_name, section, email, images: capturedImages })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`✅ ${name} registered successfully! ID: ${data.student_id}`, 'success');
+      if (regStream) { regStream.getTracks().forEach(t => t.stop()); regStream = null; }
+      setTimeout(() => location.href = '/students', 2000);
+    } else {
+      showToast(data.error || 'Registration failed.', 'error');
+      btn.disabled = false;
+      btn.textContent = '✅ Register Student';
+    }
+  } catch(e) {
+    showToast('Server error. Try again.', 'error');
+    btn.disabled = false;
+    btn.textContent = '✅ Register Student';
+  }
+}
+</script>
+{% endblock %}

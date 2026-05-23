@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Security Logs — AttendAI{% endblock %}
+{% block content %}
+<div class="topbar">
+  <h2>🔐 Security Logs</h2>
+  <div class="topbar-right">
+    <span class="badge badge-cyan">{{ logs|length }} entries</span>
+  </div>
+</div>
+<div class="content">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Recent Activity</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>Event</th><th>User</th><th>Student</th><th>Details</th><th>Severity</th></tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td style="font-family:Space Mono,monospace;font-size:11px;color:var(--muted);white-space:nowrap;">{{ log.timestamp[:19] if log.timestamp else '—' }}</td>
+            <td><span style="font-family:Space Mono,monospace;font-size:12px;color:var(--accent);">{{ log.event_type }}</span></td>
+            <td>{{ log.username or '—' }}</td>
+            <td style="font-size:12px;color:var(--muted);">{{ log.student_id or '—' }}</td>
+            <td style="font-size:12px;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ log.details or '—' }}</td>
+            <td>
+              {% if log.severity == 'CRITICAL' %}
+                <span class="badge badge-red">CRITICAL</span>
+              {% elif log.severity == 'WARNING' %}
+                <span class="badge" style="color:var(--yellow);border-color:var(--yellow);background:rgba(255,214,10,0.08);">WARNING</span>
+              {% else %}
+                <span class="badge badge-cyan">INFO</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:40px;">No logs yet</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

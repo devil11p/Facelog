@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Reports — AttendAI{% endblock %}
+{% block content %}
+<div class="topbar">
+  <h2>📊 Reports</h2>
+  <div class="topbar-right">
+    <button class="btn btn-ghost btn-sm" onclick="location.href='/dashboard'">← Dashboard</button>
+  </div>
+</div>
+<div class="content">
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-header"><span class="card-title">Date-wise Attendance</span></div>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:11px;font-family:Space Mono,monospace;color:var(--muted);margin-bottom:6px;text-transform:uppercase;">Date</div>
+        <input type="date" id="date-picker" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;" />
+      </div>
+      <button class="btn btn-primary" onclick="loadDateReport()">Load</button>
+      <a id="export-link" class="btn btn-ghost" href="/api/export_csv" target="_blank">⬇ Export CSV</a>
+    </div>
+    <div style="margin-top:20px;">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Roll No</th><th>Name</th><th>Class</th><th>Status</th><th>Time In</th><th>Time Out</th><th>Confidence</th></tr>
+          </thead>
+          <tbody id="report-tbody">
+            <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:40px;">Select a date and click Load</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Range Report</span></div>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div>
+        <div style="font-size:11px;font-family:Space Mono,monospace;color:var(--muted);margin-bottom:6px;">FROM</div>
+        <input type="date" id="start-date" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;" />
+      </div>
+      <div>
+        <div style="font-size:11px;font-family:Space Mono,monospace;color:var(--muted);margin-bottom:6px;">TO</div>
+        <input type="date" id="end-date" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;color:var(--text);font-size:13px;outline:none;" />
+      </div>
+      <button class="btn btn-primary" onclick="loadRangeReport()">Generate</button>
+    </div>
+    <div style="margin-top:20px;">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Roll No</th><th>Class</th><th>Present Days</th><th>Late Days</th></tr>
+          </thead>
+          <tbody id="range-tbody">
+            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:40px;">Select date range and click Generate</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+// Set today as default
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('date-picker').value = today;
+document.getElementById('start-date').value = today;
+document.getElementById('end-date').value = today;
+
+async function loadDateReport() {
+  const date = document.getElementById('date-picker').value;
+  document.getElementById('export-link').href = `/api/export_csv?date=${date}`;
+  const res = await fetch(`/api/attendance_today?date=${date}`);
+  const data = await res.json();
+  const tbody = document.getElementById('report-tbody');
+  if (!data.records || data.records.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:40px;">No data for this date</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.records.map(s => `
+    <tr>
+      <td style="font-family:Space Mono,monospace;font-size:12px;">${s.roll_no}</td>
+      <td><strong>${s.name}</strong></td>
+      <td>${s.class_name || '—'}</td>
+      <td><span class="badge ${s.status === 'Present' ? 'badge-green' : s.status === 'Late' ? 'badge-cyan' : 'badge-red'}">${s.status}</span></td>
+      <td style="font-family:Space Mono,monospace;font-size:12px;">${s.time_in}</td>
+      <td style="font-family:Space Mono,monospace;font-size:12px;">${s.time_out}</td>
+      <td style="font-family:Space Mono,monospace;font-size:12px;">${s.confidence}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadRangeReport() {
+  const start = document.getElementById('start-date').value;
+  const end = document.getElementById('end-date').value;
+  const res = await fetch(`/api/report?start=${start}&end=${end}`);
+  const data = await res.json();
+  const tbody = document.getElementById('range-tbody');
+  if (!data.report || data.report.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:40px;">No data found</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.report.map(r => `
+    <tr>
+      <td><strong>${r.name}</strong></td>
+      <td style="font-family:Space Mono,monospace;font-size:12px;">${r.roll_no || '—'}</td>
+      <td>${r.class_name || '—'}</td>
+      <td><span style="color:var(--green);font-weight:700;font-family:Space Mono,monospace;">${r.present_days}</span></td>
+      <td><span style="color:var(--yellow);font-weight:700;font-family:Space Mono,monospace;">${r.late_days}</span></td>
+    </tr>
+  `).join('');
+}
+</script>
+{% endblock %}

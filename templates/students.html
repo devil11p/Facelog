@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Students — AttendAI{% endblock %}
+{% block content %}
+<div class="topbar">
+  <h2>👥 Students</h2>
+  <div class="topbar-right">
+    <span class="badge badge-cyan">{{ students|length }} Total</span>
+    <button class="btn btn-primary btn-sm" onclick="location.href='/register'">➕ Register New</button>
+  </div>
+</div>
+<div class="content">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">All Registered Students</span>
+      <input type="text" id="search-input" placeholder="Search name or roll..." oninput="filterTable()"
+             style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;color:var(--text);font-size:13px;outline:none;width:220px;" />
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Student ID</th>
+            <th>Name</th>
+            <th>Roll No</th>
+            <th>Class</th>
+            <th>Section</th>
+            <th>Email</th>
+            <th>Face Enrolled</th>
+            <th>Registered</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="students-tbody">
+          {% for s in students %}
+          <tr class="student-row">
+            <td><span style="font-family:Space Mono,monospace;font-size:11px;color:var(--muted);">{{ s.student_id }}</span></td>
+            <td><strong>{{ s.name }}</strong></td>
+            <td><span style="font-family:Space Mono,monospace;">{{ s.roll_no or '—' }}</span></td>
+            <td>{{ s.class_name or '—' }}</td>
+            <td>{{ s.section or '—' }}</td>
+            <td style="font-size:12px;color:var(--muted);">{{ s.email or '—' }}</td>
+            <td>
+              {% if s.face_encoding %}
+                <span class="badge badge-green">✓ Yes</span>
+              {% else %}
+                <span class="badge badge-red">✗ No</span>
+              {% endif %}
+            </td>
+            <td style="font-size:11px;color:var(--muted);font-family:Space Mono,monospace;">{{ s.registered_at[:10] if s.registered_at else '—' }}</td>
+            <td>
+              <button class="btn btn-danger btn-sm" onclick="deleteStudent('{{ s.student_id }}', '{{ s.name }}')">🗑</button>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px;">No students registered yet. <a href="/register" style="color:var(--accent);">Register one →</a></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function filterTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  document.querySelectorAll('.student-row').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+async function deleteStudent(id, name) {
+  if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
+  const res = await fetch(`/api/delete_student/${id}`, {method:'DELETE'});
+  const data = await res.json();
+  if (data.success) { showToast(`${name} deleted.`, 'success'); setTimeout(()=>location.reload(), 1000); }
+  else showToast(data.error || 'Error deleting student.', 'error');
+}
+</script>
+{% endblock %}

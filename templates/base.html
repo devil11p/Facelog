@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Smart Attendance AI{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #080c14;
+      --surface:  #0d1420;
+      --border:   #1a2540;
+      --accent:   #00e5ff;
+      --accent2:  #7c3aed;
+      --green:    #00ff9d;
+      --red:      #ff3d5a;
+      --yellow:   #ffd60a;
+      --text:     #e2e8f0;
+      --muted:    #4a5568;
+      --radius:   8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+    }
+    /* Sidebar */
+    .sidebar {
+      width: 220px;
+      min-height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+    .sidebar-logo {
+      padding: 24px 20px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo h1 {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-family: 'Space Mono', monospace;
+    }
+    .sidebar-logo p {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+      font-family: 'Space Mono', monospace;
+    }
+    .sidebar-nav {
+      flex: 1;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.15s;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+    }
+    .nav-item:hover { color: var(--text); background: var(--border); }
+    .nav-item.active { color: var(--accent); background: rgba(0,229,255,0.08); border-left: 3px solid var(--accent); }
+    .nav-item .icon { width: 18px; text-align: center; font-size: 16px; }
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .user-badge {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .user-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; color: white;
+    }
+    .user-info { flex: 1; min-width: 0; }
+    .user-name { font-size: 13px; font-weight: 600; truncate; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-role { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; }
+    .logout-btn {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 16px; padding: 4px; transition: color 0.15s;
+    }
+    .logout-btn:hover { color: var(--red); }
+
+    /* Main content */
+    .main {
+      margin-left: 220px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .topbar {
+      padding: 20px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface);
+    }
+    .topbar h2 {
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .topbar-right {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      border: 1px solid;
+    }
+    .badge-cyan  { color: var(--accent);  border-color: var(--accent);  background: rgba(0,229,255,0.08); }
+    .badge-green { color: var(--green);   border-color: var(--green);   background: rgba(0,255,157,0.08); }
+    .badge-red   { color: var(--red);     border-color: var(--red);     background: rgba(255,61,90,0.08);  }
+    .badge-purple{ color: var(--accent2); border-color: var(--accent2); background: rgba(124,58,237,0.08);}
+
+    /* Content */
+    .content { padding: 32px; flex: 1; }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Stat cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+    .stat-card.cyan::before  { background: var(--accent); }
+    .stat-card.green::before { background: var(--green); }
+    .stat-card.red::before   { background: var(--red); }
+    .stat-card.purple::before{ background: var(--accent2); }
+    .stat-label { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: 0.1em; }
+    .stat-value { font-size: 36px; font-weight: 800; margin: 6px 0; line-height: 1; }
+    .stat-card.cyan  .stat-value { color: var(--accent); }
+    .stat-card.green .stat-value { color: var(--green); }
+    .stat-card.red   .stat-value { color: var(--red); }
+    .stat-card.purple .stat-value { color: var(--accent2); }
+    .stat-sub { font-size: 12px; color: var(--muted); }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 12px 16px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(26,37,64,0.5);
+    }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 9px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+      font-family: 'Syne', sans-serif;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #080c14;
+    }
+    .btn-primary:hover { background: #00bcd4; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-danger {
+      background: transparent;
+      color: var(--red);
+      border: 1px solid var(--red);
+    }
+    .btn-danger:hover { background: var(--red); color: white; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* Toast */
+    #toast-container {
+      position: fixed; bottom: 24px; right: 24px;
+      z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .toast {
+      padding: 12px 20px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 600;
+      border-left: 4px solid;
+      background: var(--surface);
+      animation: slideIn 0.3s ease;
+      max-width: 320px;
+    }
+    .toast.success { border-color: var(--green); color: var(--green); }
+    .toast.error   { border-color: var(--red);   color: var(--red);   }
+    .toast.info    { border-color: var(--accent); color: var(--accent);}
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to   { transform: translateX(0);   opacity: 1; }
+    }
+
+    /* Pulse dot */
+    .pulse-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(1.4); }
+    }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <h1>⚡ AttendAI</h1>
+    <p>Face Recognition System</p>
+  </div>
+  <div class="sidebar-nav">
+    <a href="/dashboard" class="nav-item {% if request.path == '/dashboard' %}active{% endif %}">
+      <span class="icon">🏠</span> Dashboard
+    </a>
+    <a href="/attendance" class="nav-item {% if request.path == '/attendance' %}active{% endif %}">
+      <span class="icon">📷</span> Mark Attendance
+    </a>
+    <a href="/register" class="nav-item {% if request.path == '/register' %}active{% endif %}">
+      <span class="icon">➕</span> Register Student
+    </a>
+    <a href="/students" class="nav-item {% if request.path == '/students' %}active{% endif %}">
+      <span class="icon">👥</span> Students
+    </a>
+    <a href="/reports" class="nav-item {% if request.path == '/reports' %}active{% endif %}">
+      <span class="icon">📊</span> Reports
+    </a>
+    <a href="/logs" class="nav-item {% if request.path == '/logs' %}active{% endif %}">
+      <span class="icon">🔐</span> Security Logs
+    </a>
+  </div>
+  <div class="sidebar-footer">
+    <div class="user-badge">
+      <div class="user-avatar">{{ current_user.full_name[0].upper() if current_user.full_name else 'A' }}</div>
+      <div class="user-info">
+        <div class="user-name">{{ current_user.full_name or current_user.username }}</div>
+        <div class="user-role">{{ current_user.role }}</div>
+      </div>
+      <button class="logout-btn" onclick="logout()" title="Logout">⏻</button>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<div class="main">
+  {% block content %}{% endblock %}
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+function showToast(msg, type='info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+async function logout() {
+  await fetch('/api/logout', {method:'POST'});
+  location.href = '/login';
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

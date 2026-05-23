@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — Smart Attendance AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #080c14; --surface: #0d1420; --border: #1a2540;
+      --accent: #00e5ff; --accent2: #7c3aed; --text: #e2e8f0;
+      --muted: #4a5568; --red: #ff3d5a; --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Animated grid background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(124,58,237,0.08), transparent 70%);
+      pointer-events: none;
+    }
+    .login-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 48px 40px;
+      width: 400px;
+      position: relative;
+      z-index: 1;
+    }
+    .login-box::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      border-radius: 16px 16px 0 0;
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .logo-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+    .logo h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--accent);
+      font-family: 'Space Mono', monospace;
+      letter-spacing: 0.1em;
+    }
+    .logo p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .field {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 8px;
+    }
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: 'Space Mono', monospace;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: var(--accent); }
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      background: var(--accent);
+      color: #080c14;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 800;
+      font-family: 'Syne', sans-serif;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all 0.2s;
+      letter-spacing: 0.05em;
+    }
+    .btn-login:hover { background: #00bcd4; transform: translateY(-1px); }
+    .btn-login:active { transform: translateY(0); }
+    .btn-login:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .error-msg {
+      background: rgba(255,61,90,0.1);
+      border: 1px solid var(--red);
+      color: var(--red);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .default-creds {
+      text-align: center;
+      margin-top: 24px;
+      padding: 12px;
+      background: rgba(0,229,255,0.04);
+      border: 1px solid rgba(0,229,255,0.1);
+      border-radius: var(--radius);
+    }
+    .default-creds p { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; }
+    .default-creds code { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <h1>ATTEND AI</h1>
+      <p>Smart Face Recognition Attendance System</p>
+    </div>
+    <div class="error-msg" id="error-msg"></div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="username" placeholder="Enter username" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="Enter password" autocomplete="current-password" />
+    </div>
+    <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In →</button>
+    <div class="default-creds">
+      <p>Default: <code>admin</code> / <code>Admin@123</code></p>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+    async function doLogin() {
+      const btn = document.getElementById('login-btn');
+      const err = document.getElementById('error-msg');
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      if (!username || !password) {
+        err.textContent = 'Please enter username and password.';
+        err.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+      err.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({username, password})
+        });
+        const data = await res.json();
+        if (data.success) {
+          location.href = '/dashboard';
+        } else {
+          err.textContent = data.error || 'Login failed.';
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Sign In →';
+        }
+      } catch(e) {
+        err.textContent = 'Server error. Try again.';
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Sign In →';
+      }
+    }
+  </script>
+</body>
+</html>
