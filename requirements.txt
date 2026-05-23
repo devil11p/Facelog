@@ -7,3 +7,4 @@ gunicorn
 python-dotenv
 scikit-learn
 pillow
+pytz
